@@ -2,182 +2,141 @@ import streamlit as st
 import plotly.graph_objects as go
 import numpy as np
 
-# === НАСТРОЙКИ СТРАНИЦЫ (Киберпанк) ===
-st.set_page_config(page_title="HOLO-DOCK V-15", layout="wide", page_icon="🏗️")
+# === НАСТРОЙКИ СТРАНИЦЫ ===
+st.set_page_config(page_title="VECTOR-15 SOLID", layout="wide", page_icon="🚀")
 
-# Убираем лишние отступы и красим фон
 st.markdown("""
     <style>
-        .block-container { padding-top: 1rem; padding-bottom: 0rem; }
-        .main { background-color: #02020a; color: #00ffff; }
-        h1, h2, h3, span { color: #00ffff !important; text-shadow: 0 0 8px #00ffff; font-family: 'Courier New', monospace; }
-        .stSelectbox label, .stSlider label { color: #ff00ff !important; }
-        div[data-testid="stMetricValue"] { color: #ff00ff; text-shadow: 0 0 10px #ff00ff; }
+        .main { background-color: #0e1117; }
+        h1, h2, h3 { color: #ffffff; font-family: sans-serif; }
     </style>
 """, unsafe_allow_html=True)
 
-# === РАСШИРЕННАЯ БАЗА ДАННЫХ ===
-
-# Двигатели (параметры сопла и камеры)
+# === БАЗА ДАННЫХ ===
 ENGINES = {
-    "MERLIN-1D (Kerolox)": {"thrust": 845, "len": 1.5, "c_r": 0.4, "t_r": 0.2, "e_r": 0.9, "color": "#ff9900"},
-    "RAPTOR V2 (Methalox)": {"thrust": 2300, "len": 2.1, "c_r": 0.6, "t_r": 0.3, "e_r": 1.3, "color": "#ff00ff"},
-    "BE-4 (Methalox)": {"thrust": 2400, "len": 2.8, "c_r": 0.7, "t_r": 0.4, "e_r": 1.5, "color": "#00ffff"},
-    "F-1 V (Saturn Legacy)": {"thrust": 6770, "len": 3.5, "c_r": 1.2, "t_r": 0.8, "e_r": 2.5, "color": "#ff3300"},
-    "ION-THRUSTER X9": {"thrust": 50, "len": 0.8, "c_r": 0.3, "t_r": 0.1, "e_r": 0.4, "color": "#00ffcc"},
-    "GRAV-DRIVE (Experimental)": {"thrust": 5000, "len": 2.0, "c_r": 1.5, "t_r": 1.0, "e_r": 1.8, "color": "#ffffff"}
+    "Merlin-1D": {"thrust": 845, "len": 1.5, "r": 0.5, "color": "orange"},
+    "Raptor V2": {"thrust": 2300, "len": 2.2, "r": 0.7, "color": "purple"},
+    "F-1 Legacy": {"thrust": 6770, "len": 3.8, "r": 1.8, "color": "red"},
+    "Ion-X": {"thrust": 50, "len": 0.8, "r": 0.4, "color": "cyan"}
 }
 
-# Конфигурации ракет (Ступени, размеры, какие двигатели и сколько их)
 ROCKETS = {
-    "VECTOR-Scout (Light)": {
+    "VECTOR-Scout": {
         "stages": [
-            {"type": "body", "h": 14.0, "d": 2.0, "eng": "MERLIN-1D (Kerolox)", "count": 1}, # Ступень 1
-            {"type": "body", "h": 6.0, "d": 1.8, "eng": "MERLIN-1D (Kerolox)", "count": 1},  # Ступень 2
-            {"type": "fairing", "h": 4.0, "d": 1.8} # Обтекатель
+            {"h": 12.0, "d": 2.0, "eng": "Merlin-1D", "count": 1, "color": "lightgray"},
+            {"h": 5.0, "d": 2.0, "eng": "Merlin-1D", "count": 1, "color": "white"}
         ]
     },
-    "AERO-Vanguard (Medium)": {
+    "TITAN-Heavy": {
         "stages": [
-            {"type": "body", "h": 25.0, "d": 3.7, "eng": "BE-4 (Methalox)", "count": 2},
-            {"type": "body", "h": 10.0, "d": 3.7, "eng": "RAPTOR V2 (Methalox)", "count": 1},
-            {"type": "fairing", "h": 6.0, "d": 3.7}
+            {"h": 30.0, "d": 4.0, "eng": "Raptor V2", "count": 7, "color": "silver"}, # 7 двигателей!
+            {"h": 15.0, "d": 4.0, "eng": "Raptor V2", "count": 1, "color": "white"}
         ]
     },
-    "TITAN-Heavy (Orbital)": {
+    "STAR-CRUISER": {
         "stages": [
-            {"type": "body", "h": 35.0, "d": 5.5, "eng": "RAPTOR V2 (Methalox)", "count": 7}, # Кластер из 7 двигателей
-            {"type": "body", "h": 15.0, "d": 5.5, "eng": "RAPTOR V2 (Methalox)", "count": 1},
-            {"type": "fairing", "h": 8.0, "d": 5.5}
-        ]
-    },
-    "STAR-CRUISER (Interplanetary)": {
-        "stages": [
-            {"type": "body", "h": 50.0, "d": 9.0, "eng": "F-1 V (Saturn Legacy)", "count": 9}, # Монстр
-            {"type": "body", "h": 30.0, "d": 9.0, "eng": "GRAV-DRIVE (Experimental)", "count": 3},
-            {"type": "fairing", "h": 15.0, "d": 9.0}
+            {"h": 50.0, "d": 9.0, "eng": "F-1 Legacy", "count": 12, "color": "darkgray"}, # Монстр
+            {"h": 25.0, "d": 9.0, "eng": "Ion-X", "count": 6, "color": "gray"}
         ]
     }
 }
 
-# === ГЕНЕРАТОРЫ УЛЬТРА-ДЕТАЛИЗИРОВАННОЙ СЕТКИ ===
-# nr=40, nt=80 - очень высокая плотность точек для "вау-эффекта"
+# === ФУНКЦИИ 3D (ТВЕРДЫЕ ТЕЛА) ===
+def cylinder(r, h, z0, color_scale='Gray'):
+    # Создает твердый цилиндр
+    theta = np.linspace(0, 2*np.pi, 50)
+    z = np.linspace(z0, z0+h, 10)
+    theta_grid, z_grid = np.meshgrid(theta, z)
+    x_grid = r * np.cos(theta_grid)
+    y_grid = r * np.sin(theta_grid)
+    return x_grid, y_grid, z_grid
 
-def gen_cylinder(r_base, r_top, h, z_pos, nr=40, nt=80):
-    t = np.linspace(0, 2*np.pi, nt)
-    r = np.linspace(r_base, r_top, nr)
-    T, R = np.meshgrid(t, r)
-    X = R * np.cos(T)
-    Y = R * np.sin(T)
-    Z = np.linspace(z_pos, z_pos + h, nr)
-    _, Z_mesh = np.meshgrid(t, Z)
-    return X.flatten(), Y.flatten(), Z_mesh.flatten()
-
-# Функция для создания одного двигателя в нужной точке
-def build_engine(eng_data, ox, oy, oz, scale):
-    l, cr, tr, er = eng_data['len']*scale, eng_data['c_r']*scale, eng_data['t_r']*scale, eng_data['e_r']*scale
-    # Камера
-    cx, cy, cz = gen_cylinder(cr, cr, l*0.5, oz, nr=20, nt=40)
-    # Горловина
-    tx, ty, tz = gen_cylinder(cr, tr, l*0.2, oz + l*0.5, nr=10, nt=40)
-    # Сопло
-    nx, ny, nz = gen_cylinder(tr, er, l*0.3, oz + l*0.7, nr=30, nt=60)
-    return cx+ox, cy+oy, cz, tx+ox, ty+oy, tz, nx+ox, ny+oy, nz
+def cone(r_base, h, z0):
+    # Создает конус (обтекатель)
+    theta = np.linspace(0, 2*np.pi, 50)
+    z = np.linspace(z0, z0+h, 10)
+    theta_grid, z_grid = np.meshgrid(theta, z)
+    # Радиус уменьшается с высотой
+    r_grid = r_base * (1 - (z_grid - z0)/h)
+    x_grid = r_grid * np.cos(theta_grid)
+    y_grid = r_grid * np.sin(theta_grid)
+    return x_grid, y_grid, z_grid
 
 # === ИНТЕРФЕЙС ===
-st.title("🏗️ HOLO-DOCK // VECTOR-15 ARSENAL")
+st.title("🚀 VECTOR-15 DESIGN BUREAU")
+st.write("Solid-State Rendering Core Active")
 
 with st.sidebar:
-    st.header("💠 ASSEMBLY CONFIG")
-    rocket_name = st.selectbox("SELECT HULL CLASS", list(ROCKETS.keys()))
-    st.markdown("---")
-    st.header("📐 VIEW CONTROLS")
-    scale = st.slider("Holo-Scale", 0.5, 2.0, 1.0, 0.1)
-    rot_z = st.slider("Rotate Dock (Z-Axis)", 0, 360, 90, 5)
+    st.header("Configuration")
+    model = st.selectbox("Select Rocket Model", list(ROCKETS.keys()))
+    scale = st.slider("Scale Factor", 0.5, 2.0, 1.0)
 
-# === СБОРКА РАКЕТЫ (ГЛАВНЫЙ АЛГОРИТМ) ===
-rocket_data = ROCKETS[rocket_name]
-traces = []
-current_z = 0.0
-total_thrust = 0
+# === СБОРКА СЦЕНЫ ===
+fig = go.Figure()
+rocket = ROCKETS[model]
+current_z = 0
 
-# Математика вращения для слайдера
-angle_rad = np.radians(rot_z)
-cos_a, sin_a = np.cos(angle_rad), np.sin(angle_rad)
-
-def rotate_xy(x, y): return x*cos_a - y*sin_a, x*sin_a + y*cos_a
-
-# Проходим по всем ступеням и собираем их
-for stage in rocket_data["stages"]:
+# 1. Рисуем ступени и двигатели
+for stage in rocket["stages"]:
     h, d = stage["h"] * scale, stage["d"] * scale
     
-    if stage["type"] == "body":
-        # 1. Строим корпус ступени (Синий неон)
-        bx, by, bz = gen_cylinder(d/2, d/2, h, current_z)
-        rbx, rby = rotate_xy(bx, by)
-        traces.append(go.Scatter3d(x=rbx, y=rby, z=bz, mode='lines', line=dict(color='#0088ff', width=3), opacity=0.4, name="Hull"))
-        traces.append(go.Scatter3d(x=rbx, y=rby, z=bz, mode='markers', marker=dict(size=1.5, color='#00ffff'), opacity=0.6, name="Hull Grid"))
+    # КОРПУС (Solid Surface)
+    x, y, z = cylinder(d/2, h, current_z)
+    fig.add_trace(go.Surface(x=x, y=y, z=z, colorscale='Greys', showscale=False, opacity=1.0, lighting=dict(ambient=0.5, diffuse=0.8)))
+    
+    # ДВИГАТЕЛИ
+    eng_name = stage["eng"]
+    eng_data = ENGINES[eng_name]
+    count = stage["count"]
+    
+    # Логика расстановки (Кластер)
+    offsets = []
+    if count == 1: offsets = [(0,0)]
+    else:
+        # Расставляем по кругу
+        r_circle = (d/2) * 0.6
+        angles = np.linspace(0, 2*np.pi, count, endpoint=False)
+        offsets = [(r_circle*np.cos(a), r_circle*np.sin(a)) for a in angles]
+    
+    # Рисуем каждый двигатель как конус/сопло
+    for ox, oy in offsets:
+        eng_len = eng_data['len'] * scale
+        eng_r = eng_data['r'] * scale
         
-        # 2. Расставляем двигатели снизу ступени
-        eng_info = ENGINES[stage["eng"]]
-        count = stage["count"]
-        total_thrust += eng_info["thrust"] * count
+        # Сопло (Конус вниз)
+        theta = np.linspace(0, 2*np.pi, 20)
+        z_nozzle = np.linspace(current_z - eng_len, current_z, 10)
+        th_g, z_g = np.meshgrid(theta, z_nozzle)
+        # Радиус растет к низу (сопло)
+        r_g = eng_r * ((current_z - z_g)/eng_len * 0.5 + 0.5) 
         
-        # Вычисляем позиции для кластера двигателей
-        if count == 1: offsets = [(0,0)]
-        else:
-            radius = (d/2) * 0.6 # Двигатели стоят по кругу внутри диаметра
-            angles = np.linspace(0, 2*np.pi, count, endpoint=False)
-            offsets = [(radius*np.cos(a), radius*np.sin(a)) for a in angles]
-            
-        for ox, oy in offsets:
-            # Строим двигатель со смещением (Маджента неон)
-            ecx, ecy, ecz, etx, ety, etz, enx, eny, enz = build_engine(eng_info, ox, oy, current_z - (eng_info['len']*scale), scale)
-            # Вращаем и добавляем
-            rcx, rcy = rotate_xy(ecx, ecy); rtx, rty = rotate_xy(etx, ety); rnx, rny = rotate_xy(enx, eny)
-            
-            eng_style = dict(mode='lines+markers', line=dict(color=eng_info['color'], width=2), marker=dict(size=2, color='#ffffff', opacity=0.8))
-            traces.append(go.Scatter3d(x=rcx, y=rcy, z=ecz, **eng_style, name="Chamber"))
-            traces.append(go.Scatter3d(x=rnx, y=rny, z=enz, **eng_style, name="Nozzle"))
+        x_eng = r_g * np.cos(th_g) + ox
+        y_eng = r_g * np.sin(th_g) + oy
+        
+        # Цвет сопла зависит от типа
+        cscale = 'Oranges' if 'Merlin' in eng_name or 'F-1' in eng_name else 'Bluered'
+        
+        fig.add_trace(go.Surface(x=x_eng, y=y_eng, z=z_g, colorscale=cscale, showscale=False))
 
-    elif stage["type"] == "fairing":
-        # 3. Строим обтекатель сверху (Циан неон)
-        fx, fy, fz = gen_cylinder(d/2, 0, h, current_z, nr=50) # Верхний радиус 0 = конус
-        rfx, rfy = rotate_xy(fx, fy)
-        traces.append(go.Scatter3d(x=rfx, y=rfy, z=fz, mode='lines', line=dict(color='#00ffff', width=3), opacity=0.5, name="Fairing"))
-        traces.append(go.Scatter3d(x=rfx, y=rfy, z=fz, mode='markers', marker=dict(size=2, color='#ffffff'), opacity=0.8, name="Fairing Grid"))
+    current_z += h
 
-    current_z += h # Поднимаемся выше для следующей ступени
+# 2. Обтекатель сверху (Нос)
+last_d = rocket["stages"][-1]["d"] * scale
+xf, yf, zf = cone(last_d/2, 5.0 * scale, current_z)
+fig.add_trace(go.Surface(x=xf, y=yf, z=zf, colorscale='Greys', showscale=False))
 
-# === ВИЗУАЛИЗАЦИЯ ===
-c1, c2 = st.columns([3, 1])
+# === ОТОБРАЖЕНИЕ ===
+fig.update_layout(
+    scene=dict(
+        xaxis=dict(visible=False),
+        yaxis=dict(visible=False),
+        zaxis=dict(visible=False),
+        aspectmode='data'
+    ),
+    margin=dict(l=0, r=0, t=0, b=0),
+    height=700,
+    paper_bgcolor='#0e1117'
+)
 
-with c1:
-    # Настройка 3D сцены
-    fig = go.Figure(data=traces)
-    fig.update_layout(
-        scene=dict(
-            xaxis=dict(visible=False, range=[-15, 15]),
-            yaxis=dict(visible=False, range=[-15, 15]),
-            zaxis=dict(visible=False, range=[0, 100]), # Высокая ось Z для больших ракет
-            bgcolor='#02020a',
-            aspectmode='data' # Сохранять реальные пропорции
-        ),
-        margin=dict(l=0, r=0, t=0, b=0),
-        paper_bgcolor='#02020a',
-        showlegend=False,
-        height=700 # Высокое окно
-    )
-    st.plotly_chart(fig, use_container_width=True)
-
-with c2:
-    st.header("📊 SPEC SHEET")
-    st.metric("TOTAL STACK HEIGHT", f"{current_z:.1f} M")
-    st.metric("LIFTOFF THRUST", f"{total_thrust/1000:.1f} MN")
-    st.markdown("---")
-    st.write("STAGES DETECTED:")
-    for i, stage in enumerate(rocket_data["stages"]):
-        if stage["type"] == "body":
-            st.code(f"STAGE {i+1}: {stage['count']}x {stage['eng']}")
-    st.markdown("---")
-    st.caption("HOLO-RENDER CORE V3 // GPU ACCELERATED")
+st.plotly_chart(fig, use_container_width=True)
+st.metric("Total Height", f"{(current_z + 5*scale):.1f} meters")
