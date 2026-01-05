@@ -279,52 +279,67 @@ run = st.checkbox("ACTIVATE GESTURE CONTROL", value=True)
 if run:
     c_cam, c_stat = st.columns([1, 4])
     with c_cam: cam_ph = st.empty()
-    with c_stat: st.info("Use gestures to inspect the engine while simulating flight data.")
+    with c_stat: status_ph = st.empty()
 
-    hands = mp.solutions.hands.Hands(max_num_hands=2, min_detection_confidence=0.7)
-    cap = cv2.VideoCapture(0)
-    last_t = 0
-    rot_speed = 0
-    
-    while run:
-        ret, frame = cap.read()
-        if not ret: break
-        frame = cv2.flip(frame, 1)
-        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        res = hands.process(rgb)
-        h, w, _ = frame.shape
+    try:
+        hands = mp.solutions.hands.Hands(max_num_hands=2, min_detection_confidence=0.7)
         
-        if res.multi_hand_landmarks and len(res.multi_hand_landmarks) == 2:
-            p1 = res.multi_hand_landmarks[0].landmark[8]
-            p2 = res.multi_hand_landmarks[1].landmark[8]
-            cx1, cy1 = int(p1.x*w), int(p1.y*h)
-            cx2, cy2 = int(p2.x*w), int(p2.y*h)
-            
-            dist = math.hypot(cx2-cx1, cy2-cy1)
-            st.session_state.hand_scale = np.interp(dist, [50, 500], [0.5, 2.5])
-            
-            dy = cy2 - cy1
-            if abs(dy) > 30: rot_speed = dy * 0.002
-            else: rot_speed = 0
-            st.session_state.rotation_angle += rot_speed
-            cv2.line(frame, (cx1, cy1), (cx2, cy2), (0, 255, 0), 2)
-            
-        cam_ph.image(frame, channels="BGR")
+        # Попытка подключиться к камере (только для локального запуска)
+        cap = cv2.VideoCapture(0) 
+        if not cap.isOpened():
+            status_ph.warning("⚠️ CAMERA NOT FOUND (Server Mode). Use sliders to control the engine.")
+            # Если камеры нет, просто останавливаем этот блок, но сайт продолжает работать
+            run = False 
+        else:
+            status_ph.info("Gestures Active: Pinch to Zoom, Rotate hands to Spin.")
+
+        last_t = 0
+        rot_speed = 0
         
-        if time.time() - last_t > 0.1:
-            s = st.session_state.hand_scale
-            a = st.session_state.rotation_angle
-            # Перерисовка 3D
-            hx, hy, hz, px, py, pz, vx, vy, vz, ax, ay, az = generate_final_mesh(
-                db["c_r"]*scale_factor, db["t_r"]*scale_factor, db["e_r"]*scale_factor, db["len"]*scale_factor, 
-                s, a
-            )
-            with fig.batch_update():
-                fig.data[0].x, fig.data[0].y, fig.data[0].z = hx, hy, hz
-                fig.data[1].x, fig.data[1].y, fig.data[1].z = px, py, pz
-                fig.data[2].x, fig.data[2].y, fig.data[2].z = vx, vy, vz
-                fig.data[3].x, fig.data[3].y, fig.data[3].z = ax, ay, az
-            view_ph.plotly_chart(fig, use_container_width=True, key=f"v_{time.time()}")
-            last_t = time.time()
+        while run and cap.isOpened():
+            ret, frame = cap.read()
+            if not ret: break
             
-    cap.release()
+            frame = cv2.flip(frame, 1)
+            rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            res = hands.process(rgb)
+            h, w, _ = frame.shape
+            
+            if res.multi_hand_landmarks and len(res.multi_hand_landmarks) == 2:
+                p1 = res.multi_hand_landmarks[0].landmark[8]
+                p2 = res.multi_hand_landmarks[1].landmark[8]
+                cx1, cy1 = int(p1.x*w), int(p1.y*h)
+                cx2, cy2 = int(p2.x*w), int(p2.y*h)
+                
+                dist = math.hypot(cx2-cx1, cy2-cy1)
+                st.session_state.hand_scale = np.interp(dist, [50, 500], [0.5, 2.5])
+                
+                dy = cy2 - cy1
+                if abs(dy) > 30: rot_speed = dy * 0.002
+                else: rot_speed = 0
+                st.session_state.rotation_angle += rot_speed
+                cv2.line(frame, (cx1, cy1), (cx2, cy2), (0, 255, 0), 2)
+                
+            cam_ph.image(frame, channels="BGR")
+            
+            # Обновление 3D (раз в 0.1 сек)
+            if time.time() - last_t > 0.1:
+                s = st.session_state.hand_scale
+                a = st.session_state.rotation_angle
+                hx, hy, hz, px, py, pz, vx, vy, vz, ax, ay, az = generate_final_mesh(
+                    db["c_r"]*scale_factor, db["t_r"]*scale_factor, db["e_r"]*scale_factor, db["len"]*scale_factor, 
+                    s, a
+                )
+                with fig.batch_update():
+                    fig.data[0].x, fig.data[0].y, fig.data[0].z = hx, hy, hz
+                    fig.data[1].x, fig.data[1].y, fig.data[1].z = px, py, pz
+                    fig.data[2].x, fig.data[2].y, fig.data[2].z = vx, vy, vz
+                    fig.data[3].x, fig.data[3].y, fig.data[3].z = ax, ay, az
+                view_ph.plotly_chart(fig, use_container_width=True, key=f"v_{time.time()}")
+                last_t = time.time()
+                
+        if cap: cap.release()
+        
+    except Exception as e:
+        # Если библиотека крашнулась - не ломаем весь сайт
+        status_ph.error(f"Gesture Control Error: {e}")
