@@ -9,7 +9,7 @@ import math
 import time
 
 # --- 1. НАСТРОЙКИ (Стиль: Неоновый Чертеж) ---
-st.set_page_config(page_title="VECTOR-15: THE SUMMIT", layout="wide", page_icon="🚀")
+st.set_page_config(page_title="SPACEF", layout="wide", page_icon="🚀")
 
 st.markdown("""
 <style>
