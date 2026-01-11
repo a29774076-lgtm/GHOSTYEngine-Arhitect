@@ -23,9 +23,9 @@
 * **Machine Learning:** Scikit-learn (if applicable)
 
 ## 📸 Screenshots
-*(<img width="2238" height="1243" alt="image" src="https://github.com/user-attachments/assets/9c3bcace-65a7-4911-bd05-a10d70956542" />
+<img width="2238" height="1243" alt="image" src="https://github.com/user-attachments/assets/9c3bcace-65a7-4911-bd05-a10d70956542" />
 <img width="2240" height="1239" alt="image" src="https://github.com/user-attachments/assets/3ff1eeea-1deb-4c2b-8970-02dcb77931a7" />
-)*
+
 
 ---
 
