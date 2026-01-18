@@ -33,4 +33,4 @@
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/GHOSTYEngine-Arhitect/rocket_ai_app.git
+   https://github.com/a29774076-lgtm/GHOSTYEngine-Arhitect.git
