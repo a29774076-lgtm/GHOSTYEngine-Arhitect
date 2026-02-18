@@ -240,6 +240,29 @@ with col_left:
     )
     st.plotly_chart(fig_traj, use_container_width=True)
 
+    # 3. АНАЛИЗ ЦИОЛКОВСКОГО
+    st.markdown("---")
+    st.markdown("### 👽 TSIOLKOVSKY ANALYSIS")
+    
+    # Слайдер для удельного импульса
+    isp_slider = st.slider("Specific Impulse (s)", 200, 500, int(isp), key="isp_slider")
+    
+    # Расчет данных
+    mass_ratios = np.linspace(1.1, 20, 50)
+    delta_v_values = isp_slider * 9.81 * np.log(mass_ratios)
+    
+    # График
+    df_tsiolkovsky = pd.DataFrame({"Mass Ratio": mass_ratios, "Delta-V (m/s)": delta_v_values})
+    fig_ts = px.line(df_tsiolkovsky, x="Mass Ratio", y="Delta-V (m/s)", title="Rocket Equation: ΔV vs Mass Ratio")
+    fig_ts.update_traces(line_color='#00ffff')
+    fig_ts.update_layout(
+        plot_bgcolor="#00020a", paper_bgcolor="#00020a", font=dict(color="white"),
+        margin=dict(t=30,b=0,l=0,r=0), height=200, 
+        xaxis=dict(showgrid=False, title="Mass Ratio (m0/mf)"), 
+        yaxis=dict(showgrid=True, gridcolor="#333")
+    )
+    st.plotly_chart(fig_ts, use_container_width=True)
+
 # === ПРАВЫЙ СТОЛБЕЦ: 3D ГОЛОГРАММА ===
 with col_right:
     st.markdown(f"### 🧊 VISUALIZER: {selected_engine.upper()}")
